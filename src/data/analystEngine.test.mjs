@@ -148,21 +148,8 @@ test('analyst: military flag + region compose', async () => {
   assert.equal(r.items[0].id, 'RCH01');
 });
 
-test('analyst: ships headed to Oakland (destination contains)', async () => {
-  const r = await makeEngine().query({
-    layers: ['ais-live-vessels'], scope: { kind: 'anywhere' },
-    filters: [{ field: 'destination', op: 'contains', value: 'oakland' }],
-  });
-  assert.deepEqual(r.items.map((i) => i.id), ['EVERGIVEN']);
-});
-
-test('analyst: superlative — biggest fire in view radius', async () => {
-  const r = await makeEngine().query({
-    layers: ['local-firms'], scope: { kind: 'view' }, sortBy: 'frp', limit: 1,
-  });
-  assert.equal(r.items[0].id, 'FIRE-1', 'BC monster is out of view scope');
-  assert.equal(r.summary.frpMax, 1500);
-});
+// Fork-lite: FIRMS excluded from v1 (NASA FIRMS needs a key) — no fire
+// superlative test. Earthquakes layer covers the superlative pattern.
 
 test('analyst: nearest sorting attaches distanceKm ascending', async () => {
   const r = await makeEngine().query({

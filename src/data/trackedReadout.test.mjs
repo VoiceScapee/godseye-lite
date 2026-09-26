@@ -192,6 +192,8 @@ test('tracked entity publishes a protected host entry backed by the frame cache'
 });
 
 test('selection lifecycle ignores vessels, accepts installations, and clears without stale cards', () => {
+  // Fork-lite: ALPR cameras excluded (Brandon: "Take off camera location") —
+  // alpr-cameras selections are ignored like vessels.
   const originalWindow = globalThis.window;
   const fakeWindow = new EventTarget();
   const changed = makeCesiumEvent();
@@ -218,7 +220,7 @@ test('selection lifecycle ignores vessels, accepts installations, and clears wit
     assert.equal(getActiveTrackedReadoutId(), 'installations:fort-test');
     assert.equal(recorder.calls.filter(({ op }) => op === 'set').at(-1).entries[0].title, 'FORT TEST');
 
-    // ALPR cameras are static context too: a click publishes the same card.
+    // Fork-lite: ALPR cameras excluded — a click publishes no card.
     const camera = {
       gevTrackedId: 'alpr:42',
       gevDisplayPosition: () => ({ x: 4, y: 5, z: 6 }),
@@ -227,13 +229,13 @@ test('selection lifecycle ignores vessels, accepts installations, and clears wit
     fakeWindow.dispatchEvent(new CustomEvent('gev:entity-selected', {
       detail: { layerId: 'alpr-cameras', entity: camera },
     }));
-    assert.equal(getActiveTrackedReadoutId(), 'alpr:42');
-    assert.equal(recorder.calls.filter(({ op }) => op === 'set').at(-1).entries[0].title, 'FLOCK SAFETY ALPR');
+    assert.equal(getActiveTrackedReadoutId(), 'installations:fort-test', 'excluded ALPR selection leaves the installation card');
 
+    // Fork-lite: vessels excluded — selection is ignored, card stays.
     fakeWindow.dispatchEvent(new CustomEvent('gev:entity-selected', {
       detail: { layerId: 'ais-live-vessels', entity: installation },
     }));
-    assert.equal(getActiveTrackedReadoutId(), null, 'sibling selection clears an installation card');
+    assert.equal(getActiveTrackedReadoutId(), 'installations:fort-test', 'excluded vessel selection leaves the installation card');
 
     fakeWindow.dispatchEvent(new CustomEvent('gev:entity-selected', {
       detail: { layerId: 'military-installations', entity: installation },

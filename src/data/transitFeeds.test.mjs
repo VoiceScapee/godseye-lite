@@ -52,11 +52,12 @@ test('every registered feed is keyless, https, licensed, and uniquely identified
 });
 
 test('getTransitFeed is the only door to an upstream URL and refuses anything unregistered', () => {
+  // Fork-lite: MBTA disabled (no CORS headers) — use an enabled feed.
   assert.equal(
-    getTransitFeed('mbta')?.url,
-    'https://cdn.mbta.com/realtime/VehiclePositions.pb',
+    getTransitFeed('metrotransit-msp')?.url,
+    'https://svc.metrotransit.org/mtgtfs/vehiclepositions.pb',
   );
-  assert.equal(getTransitFeed('MBTA'), null);
+  assert.equal(getTransitFeed('METROTRANSIT-MSP'), null);
   assert.equal(getTransitFeed('../etc/passwd'), null);
   assert.equal(getTransitFeed('https://evil.example'), null);
   assert.equal(getTransitFeed(''), null);
@@ -74,20 +75,20 @@ test('haversine matches known city distances', () => {
 });
 
 test('feeds in range are nearest-first and honor slack as hysteresis', () => {
-  // Camera over Cambridge, MA → MBTA only.
-  const boston = transitFeedsInRange(42.37, -71.11);
+  // Fork-lite: MBTA disabled (no CORS) — camera over Minneapolis → metrotransit-msp only.
+  const minneapolis = transitFeedsInRange(44.98, -93.27);
   assert.deepEqual(
-    boston.map((f) => f.id),
-    ['mbta'],
+    minneapolis.map((f) => f.id),
+    ['metrotransit-msp'],
   );
   // Mid-Atlantic: nothing.
   assert.deepEqual(transitFeedsInRange(40, -40), []);
-  // Just outside MBTA's 70 km circle (≈ 80 km south) — out without slack, in with 20 km slack.
-  const farLat = 42.3601 - 80 / 111;
-  assert.deepEqual(transitFeedsInRange(farLat, -71.0589), []);
+  // Just outside the 70 km circle (≈ 80 km south) — out without slack, in with 20 km slack.
+  const farLat = 44.9778 - 80 / 111;
+  assert.deepEqual(transitFeedsInRange(farLat, -93.265), []);
   assert.deepEqual(
-    transitFeedsInRange(farLat, -71.0589, 20).map((f) => f.id),
-    ['mbta'],
+    transitFeedsInRange(farLat, -93.265, 20).map((f) => f.id),
+    ['metrotransit-msp'],
   );
   // Bad input never throws.
   assert.deepEqual(transitFeedsInRange(NaN, 1), []);
@@ -104,20 +105,21 @@ test('feeds in range are nearest-first and honor slack as hysteresis', () => {
   }
   assert.deepEqual(
     transitFeedsInRange(60.17, 24.94).map((f) => f.id),
-    ['hsl-helsinki'],
-    'Helsinki polls HSL only',
+    [],
+    'Fork-lite: hsl-helsinki disabled — Helsinki has no enabled feed',
   );
 });
 
 test('route hints refine a feed default and never escape the known modes', () => {
-  const mbta = getTransitFeed('mbta');
+  // Fork-lite: use getRegisteredTransitFeed for disabled feeds (mbta, hsl).
+  const mbta = getRegisteredTransitFeed('mbta');
   assert.equal(transitModeFor(mbta, 'Red'), 'subway');
   assert.equal(transitModeFor(mbta, 'Green-B'), 'tram');
   assert.equal(transitModeFor(mbta, 'CR-Fitchburg'), 'rail');
   assert.equal(transitModeFor(mbta, 'Boat-F1'), 'ferry');
   assert.equal(transitModeFor(mbta, '66'), 'bus');
   assert.equal(transitModeFor(mbta, null), 'bus');
-  const hsl = getTransitFeed('hsl-helsinki');
+  const hsl = getRegisteredTransitFeed('hsl-helsinki');
   assert.equal(transitModeFor(hsl, '31M1'), 'subway');
   assert.equal(transitModeFor(hsl, '1006'), 'tram');
   assert.equal(transitModeFor(hsl, '9982'), 'bus');
@@ -174,10 +176,11 @@ test('a mode the route id established is resolved; a feed default is only a gues
   // TransLink publishes rail in a feed whose default is bus. A consumer that
   // judges physical plausibility must know the difference, or a 140 km/h
   // train is refused as an impossible bus.
-  const translink = getTransitFeed('translink-seq');
+  // Fork-lite: use registered (disabled feeds still document their modes).
+  const translink = getRegisteredTransitFeed('translink-seq');
   assert.equal(transitModeFor(translink, '600'), 'bus');
   assert.equal(transitModeResolved(translink, '600'), false, 'defaulted');
-  const mbta = getTransitFeed('mbta');
+  const mbta = getRegisteredTransitFeed('mbta');
   assert.equal(transitModeResolved(mbta, 'Red'), true);
   assert.equal(
     transitModeResolved(mbta, '66'),
@@ -193,15 +196,17 @@ test('a mode the route id established is resolved; a feed default is only a gues
   );
 });
 
-test('only MBTA retains proxy history while every other registered feed stays live-enabled', () => {
+test('no enabled feed retains proxy history in fork-lite (v1 ships no server proxy)', () => {
+  // Fork-lite: MBTA (the only historyRetention feed) is disabled — no CORS
+  // headers. v1 ships no server proxy, so history retention is inert.
   assert.deepEqual(
     publicTransitCatalog()
       .filter((feed) => feed.historyRetention)
       .map((feed) => feed.id),
-    ['mbta'],
+    [],
   );
-  assert.equal(getTransitFeed('capmetro-austin').defaultEnabled, true);
-  assert.equal(getTransitFeed('mbta').attribution, 'MBTA / MassDOT');
+  assert.equal(getRegisteredTransitFeed('mbta').historyRetention, true);
+  assert.equal(getRegisteredTransitFeed('mbta').attribution, 'MBTA / MassDOT');
 });
 
 test('published transit history scope agrees with the catalog capability', () => {
@@ -210,7 +215,7 @@ test('published transit history scope agrees with the catalog capability', () =>
   );
   assert.deepEqual(
     retained.map((feed) => feed.id),
-    ['mbta'],
+    [],
   );
   const sources = readFileSync(
     new URL('../../DATA_SOURCES.md', import.meta.url),

@@ -224,6 +224,13 @@ const READOUT_CONTEXT_LAYERS = new Set([
   'local-adsb',
 ]);
 
+// Fork-lite: layers excluded from v1 (vessels, ALPR cameras) — selections
+// from these are ignored entirely, never clearing an active context.
+const READOUT_IGNORED_LAYERS = new Set([
+  'ais-live-vessels',
+  'alpr-cameras',
+]);
+
 /**
  * Initialize the model bridge and selection listeners. No render listener is
  * installed; the already-initialized world-overlay host owns the frame lane.
@@ -241,6 +248,8 @@ export function initTrackedReadout(viewer) {
     }) || null;
   _contextSelectedHandler = (event) => {
     const record = event.detail;
+    // Fork-lite: ignore selections from excluded layers entirely.
+    if (READOUT_IGNORED_LAYERS.has(record?.layerId)) return;
     if (READOUT_CONTEXT_LAYERS.has(record?.layerId)) {
       _selectedContext = record;
       publishEntity(record.entity);
